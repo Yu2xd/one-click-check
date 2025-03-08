@@ -38,7 +38,13 @@ public class DiagnosisUtils {
         return date.format(customFormatter);
     }
 
-    
+    public static String getFilesListLastModifiedTime(List<String> filesList) throws IOException {
+        String res = new String();
+        for (String file : filesList) {
+            res = res + "\t" + String.format("%s : %s",file, getFileLastModifiedTime(file)) + "\n"; 
+        }
+        return res;
+    }
 
     /**
      * 获取日期最新的 2 张 PNG 图片路径
@@ -234,7 +240,7 @@ public class DiagnosisUtils {
      */
     public static String generateCheckReport(String xRayState, String detectorState, String penState, 
                                         String beltSpeedState, String progState, String collectState,
-                                        String curProgReplaceTime, String curModelReplaceTime, String blankDetectionState) throws IOException {
+                                        String curProgAndModelReplaceTime, String blankDetectionState) throws IOException {
         // 非空检验
         String finalXRayState = StringEmptyCheck(xRayState);
         String finalDetectorState = StringEmptyCheck(detectorState);
@@ -242,8 +248,7 @@ public class DiagnosisUtils {
         String finalBeltSpeedState = StringEmptyCheck(beltSpeedState);
         String finalProgState = StringEmptyCheck(progState);
         String finalCollectState = StringEmptyCheck(collectState);
-        String finalCurProgReplaceTime = StringEmptyCheck(curProgReplaceTime);
-        String finalCurModelReplaceTime = StringEmptyCheck(curModelReplaceTime);
+        String finalCurProgAndModelReplaceTime = StringEmptyCheck(curProgAndModelReplaceTime);
         String finalBlankDetectionState = StringEmptyCheck(blankDetectionState);
 
         // 生成时间戳
@@ -275,10 +280,7 @@ public class DiagnosisUtils {
             bw.write(">>采集数据：" + finalCollectState);
             bw.newLine();
             bw.newLine();
-            bw.write(">>当前程序的替换时间：" + finalCurProgReplaceTime);
-            bw.newLine();
-            bw.newLine();
-            bw.write(">>当前模型的替换时间：" + finalCurModelReplaceTime);
+            bw.write(">>当前程序/模型的替换时间：\n" + finalCurProgAndModelReplaceTime);
             
             bw.close();
             reportFileWriter.close();
@@ -322,7 +324,7 @@ public class DiagnosisUtils {
 
     public static void testGenerateCheckReport() {
         try {
-            generateCheckReport("",null,"","","","",null, null, null);
+            generateCheckReport("",null,"","","","",null, null);
             System.out.println("检测报告生成完成");
         } catch (IOException e) {
             System.err.println("检测报告生成失败: " + e.getMessage());
