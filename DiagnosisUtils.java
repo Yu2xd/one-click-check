@@ -19,7 +19,112 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.ArrayList;
 
+import com.github.s7connector.api.DaveArea;
+import com.github.s7connector.api.S7Connector;
+import com.github.s7connector.api.factory.S7ConnectorFactory;
+import com.github.s7connector.impl.serializer.converter.RealConverter;
+
+
 public class DiagnosisUtils {
+
+    /**
+     * 获取皮带速度信息
+     * 读取速度反馈、频率反馈和给定频率的值，每个值读取5次（每秒读取一次）
+     *
+     * @return 格式化的速度和频率信息
+     * @throws IOException 如果读取失败
+     */
+    // PLC IP 地址
+    private static final String PLC_IP = "192.168.10.22";
+    // S7 端口
+    private static final int S7_PORT = 102; 
+    public static String getBeltSpeedInfo() throws IOException {
+        S7Connector s7Connector = null;
+        try {
+            // 创建S7的连接
+            s7Connector = S7ConnectorFactory
+                    .buildTCPConnector()
+                    .withHost(PLC_IP)//plc Ip地址
+                    .withPort(S7_PORT)  // 标准S7端口
+                    .withTimeout(10000)  // 连接超时时间
+                    .withRack(0)  // 架机号
+                    .withSlot(1)  // 插槽号
+                    .build();
+
+            // 存储读取的值
+            float[] speedFeedbackValues = new float[5];
+            float[] frequencyFeedbackValues = new float[5];
+            float[] frequencySetpointValues = new float[5];
+
+            // 定义DB4地址和偏移量
+            final int dbNumber = 4;  // DB4
+            final int speedFeedbackOffset = 28;  // 速度反馈 DB4 28.0
+            final int frequencyFeedbackOffset = 20;  // 频率反馈 DB4 20.0
+            final int frequencySetpointOffset = 44;  // 频率给定值 DB4 44.0
+
+            // 创建实数转换器
+            RealConverter realConverter = new RealConverter();
+
+            // 每秒读取一次，共读取5次
+            for (int i = 0; i < 5; i++) {
+                // 读取速度反馈值
+                byte[] speedData = s7Connector.read(DaveArea.DB, dbNumber, 4, speedFeedbackOffset);
+                speedFeedbackValues[i] = realConverter.extract(Float.class, speedData, 0, 0);
+
+                // 读取频率反馈值
+                byte[] freqFeedbackData = s7Connector.read(DaveArea.DB, dbNumber, 4, frequencyFeedbackOffset);
+                frequencyFeedbackValues[i] = realConverter.extract(Float.class, freqFeedbackData, 0, 0);
+
+                // 读取频率设定值
+                byte[] freqSetpointData = s7Connector.read(DaveArea.DB, dbNumber, 4, frequencySetpointOffset);
+                frequencySetpointValues[i] = realConverter.extract(Float.class, freqSetpointData, 0, 0);
+
+                // 等待1秒
+                if (i < 4) {
+                    Thread.sleep(1000);
+                }
+            }
+
+            // 格式化数据
+            StringBuilder result = new StringBuilder();
+            result.append("\t 实时速度反馈：").append(formatArray(speedFeedbackValues)).append("\n");
+            result.append("\t 实时频率反馈：").append(formatArray(frequencyFeedbackValues)).append("\n");
+            result.append("\t 预设频率：").append(formatArray(frequencySetpointValues)).append("\n");
+
+            return result.toString();
+        } catch (Exception e) {
+            throw new IOException("读取PLC数据失败: " + e.getMessage(), e);
+        } finally {
+            // 确保连接关闭
+            if (s7Connector != null) {
+                try {
+                    s7Connector.close();
+                } catch (Exception e) {
+                    // 关闭连接时的异常可以记录但不要抛出
+                    System.err.println("关闭PLC连接失败: " + e.getMessage());
+                }
+            }
+        }
+    }
+
+    /**
+     * 将浮点数组格式化为 [x.xx,x.xx,x.xx,x.xx,x.xx] 形式的字符串
+     *
+     * @param array 浮点数组
+     * @return 格式化的字符串
+     */
+    private static String formatArray(float[] array) {
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < array.length; i++) {
+            // 使用String.format保留两位小数
+            sb.append(String.format("%.2f", array[i]));
+            if (i < array.length - 1) {
+                sb.append(",");
+            }
+        }
+        sb.append("]");
+        return sb.toString();
+    }
 
     /**
      * 获取指定文件的最后修改时间
@@ -268,7 +373,7 @@ public class DiagnosisUtils {
             bw.write(">>喷吹：" + finalPenState);
             bw.newLine();
             bw.newLine();
-            bw.write(">>皮带速度：" + finalBeltSpeedState);
+            bw.write(">>皮带速度：\n" + finalBeltSpeedState);
             bw.newLine();
             bw.newLine();
             bw.write(">>底噪检测：" + finalBlankDetectionState);

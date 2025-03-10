@@ -2,6 +2,7 @@
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import com.alibaba.fastjson.JSONObject;
 
 public class DiagnosisImpl {
 
@@ -43,6 +44,14 @@ public class DiagnosisImpl {
 
         // TODO 获取皮带速度信息, 获取失败请返回空字符串
         String beltSpeedState = "";
+        try {
+            // 调用新实现的方法获取皮带速度信息
+            beltSpeedState = DiagnosisUtils.getBeltSpeedInfo();
+        } catch (IOException e) {
+            System.err.println("获取皮带速度信息失败: " + e.getMessage());
+            // 如果获取失败，保持空字符串
+            beltSpeedState = "";
+        }
 
         // 获取当前程序/模型的替换时间
         String curProgAndModelReplaceTime = DiagnosisUtils.getFilesListLastModifiedTime(filesName);
