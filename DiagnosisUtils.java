@@ -1,23 +1,19 @@
-import java.io.BufferedWriter;
-import java.io.ByteArrayOutputStream;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.InputStream;
+package org.example.controlsys.demos.controller;
+
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
 import java.nio.file.Path;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.Comparator;
-import java.util.Date;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import java.util.ArrayList;
 
 import com.github.s7connector.api.DaveArea;
 import com.github.s7connector.api.S7Connector;
@@ -37,7 +33,7 @@ public class DiagnosisUtils {
     // PLC IP 地址
     private static final String PLC_IP = "192.168.10.22";
     // S7 端口
-    private static final int S7_PORT = 102; 
+    private static final int S7_PORT = 102;
     public static String getBeltSpeedInfo() throws IOException {
         S7Connector s7Connector = null;
         try {
@@ -106,6 +102,85 @@ public class DiagnosisUtils {
             }
         }
     }
+    public static String getLatestRecords(int x,String path){
+        try {
+            // 读取文件
+            List<String> allLines = new ArrayList<>();
+            try (BufferedReader reader = new BufferedReader(new FileReader(path))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    allLines.add(line);
+                }
+            }
+
+            if (allLines.isEmpty()) {
+                return "No Record";
+            }
+
+            // 提取所有唯一日期并按最新排序
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+            Set<LocalDate> uniqueDates = new HashSet<>();
+
+            for (String line : allLines) {
+                try {
+                    String dateStr = line.substring(0, 10);
+                    LocalDate date = LocalDate.parse(dateStr, formatter);
+                    uniqueDates.add(date);
+                } catch (Exception e) {
+                    // 跳过格式不正确的行
+                    continue;
+                }
+            }
+
+            // 获取最新的x个日期
+            List<LocalDate> latestDates = uniqueDates.stream()
+                    .sorted(Comparator.reverseOrder())
+                    .limit(x)
+                    .collect(Collectors.toList());
+
+            if (latestDates.isEmpty()) {
+                return "No Record";
+            }
+
+            // 过滤出包含这些日期的记录
+            List<String> resultLines = new ArrayList<>();
+            for (String line : allLines) {
+                try {
+                    String dateStr = line.substring(0, 10);
+                    LocalDate date = LocalDate.parse(dateStr, formatter);
+                    if (latestDates.contains(date)) {
+                        resultLines.add(line);
+                    }
+                } catch (Exception e) {
+                    continue;
+                }
+            }
+
+            if (resultLines.isEmpty()) {
+                return "No Record";
+            }
+
+            // 按日期排序（最新的在前）
+            resultLines.sort((line1, line2) -> {
+                try {
+                    String dateStr1 = line1.substring(0, 10);
+                    String dateStr2 = line2.substring(0, 10);
+                    LocalDate date1 = LocalDate.parse(dateStr1, formatter);
+                    LocalDate date2 = LocalDate.parse(dateStr2, formatter);
+                    return date2.compareTo(date1); // 降序排列
+                } catch (Exception e) {
+                    return 0;
+                }
+            });
+
+            // 合并为一个字符串，每行一条记录
+            return String.join("\n", resultLines);
+        } catch (IOException e) {
+            return "";
+        } catch (Exception e) {
+            return "";
+        }
+    }
 
     /**
      * 将浮点数组格式化为 [x.xx,x.xx,x.xx,x.xx,x.xx] 形式的字符串
@@ -136,9 +211,9 @@ public class DiagnosisUtils {
     public static String getFileLastModifiedTime(String filePath) throws IOException {
         Path path = Paths.get(filePath);
         LocalDateTime date =  Files.getLastModifiedTime(path)
-                                    .toInstant() // 转换为时间戳
-                                    .atZone(ZoneId.systemDefault()) // 转换为系统时区
-                                    .toLocalDateTime(); // 转换为本地日期时间
+                .toInstant() // 转换为时间戳
+                .atZone(ZoneId.systemDefault()) // 转换为系统时区
+                .toLocalDateTime(); // 转换为本地日期时间
         DateTimeFormatter customFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
         return date.format(customFormatter);
     }
@@ -146,14 +221,14 @@ public class DiagnosisUtils {
     public static String getFilesListLastModifiedTime(List<String> filesList) throws IOException {
         String res = new String();
         for (String file : filesList) {
-            res = res + "\t" + String.format("%s : %s",file, getFileLastModifiedTime(file)) + "\n"; 
+            res = res + "\t" + String.format("%s : %s",file, getFileLastModifiedTime(file)) + "\n";
         }
         return res;
     }
 
     /**
      * 获取日期最新的 2 张 PNG 图片路径
-     * 
+     *
      * @param startPath 检索目录
      * @return List<path> 最新的 2 张 PNG 图片路径
      * @throws IOException
@@ -180,37 +255,37 @@ public class DiagnosisUtils {
                         return Stream.empty(); // 返回空Stream
                     }
                 });
-        
+
         List<Path> resList = new ArrayList<>();
         List<Path> pngCandidatesList = pngCandidates.collect(Collectors.toList());
         // 找出最新的PNG文件
         if (!pngCandidatesList.isEmpty()) {
             // 排序规则：按修改时间降序，时间相同按路径逆序
             List<Path> sortedList = pngCandidatesList.stream()
-            .sorted(Comparator.comparing(path -> {
-                try {
-                    return Files.getLastModifiedTime(path);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-            })
-            )
-            .collect(Collectors.toList());
+                    .sorted(Comparator.comparing(path -> {
+                                try {
+                                    return Files.getLastModifiedTime(path);
+                                } catch (IOException e) {
+                                    throw new RuntimeException(e);
+                                }
+                            })
+                    )
+                    .collect(Collectors.toList());
 
             Integer lenList = sortedList.size();
-            
+
             if (lenList >= 2) {
                 resList.add(sortedList.get(lenList - 1));
                 resList.add(sortedList.get(lenList - 2));
             }
         }
-        
-        return resList; 
+
+        return resList;
     }
 
     /**
      * 获取当前目录下最新的 2 张空皮带，并检测是否存在异常
-     * 
+     *
      * @param startPath 存放数据的目录路径
      * @return String ,res 空皮带检测结果数据
      * @throws IOException
@@ -225,17 +300,17 @@ public class DiagnosisUtils {
             List<Object> resList = blankAnomalyDetection(twoBlankPath.get(0), twoBlankPath.get(1));
             if (resList.size() == 3) {
                 res = String.format("mean_std：%s, max_std：%s, min_std: %s",
-                resList.get(0), resList.get(1), resList.get(2));
+                        resList.get(0), resList.get(1), resList.get(2));
             }
         } else {
             return new String("底噪图片不足 2 张");
         }
-        
-            return res;
+
+        return res;
     }
 
     /**
-     * 
+     *
      * @param lastOnePath 最新的 blank 图片路径
      * @param lastSecondPath 次新的 blank 图片路径
      * @return List: [平均标准差，最大标准差，最小标准差]
@@ -253,7 +328,7 @@ public class DiagnosisUtils {
 
     /**
      * 执行命令行命令 pythonCmd
-     * 
+     *
      * @param pythonCmd 执行python的命令行命令
      * @return string, python 程序的输出结果
      */
@@ -303,7 +378,7 @@ public class DiagnosisUtils {
 
     /**
      * 从 python 程序的输出结果中提取出统计信息
-     * 
+     *
      * @param resString , python 程序输出的字符串
      * @return list, 提取出来的统计信息。若出错，则为空
      */
@@ -334,7 +409,7 @@ public class DiagnosisUtils {
     }
     /**
      * 根据输入信息，生成检测报告 txt 文件
-     * 
+     *
      * @param xRayState 光机状态
      * @param detectorState 探测器状态
      * @param penState 喷吹状态
@@ -343,9 +418,9 @@ public class DiagnosisUtils {
      * @param collectState 采集程序状态
      * @throws IOException
      */
-    public static String generateCheckReport(String xRayState, String detectorState, String penState, 
-                                        String beltSpeedState, String progState, String collectState,
-                                        String curProgAndModelReplaceTime, String blankDetectionState) throws IOException {
+    public static String generateCheckReport(String xRayState, String detectorState, String penState,
+                                             String beltSpeedState, String progState, String collectState,
+                                             String curProgAndModelReplaceTime, String blankDetectionState) throws IOException {
         // 非空检验
         String finalXRayState = StringEmptyCheck(xRayState);
         String finalDetectorState = StringEmptyCheck(detectorState);
@@ -386,7 +461,7 @@ public class DiagnosisUtils {
             bw.newLine();
             bw.newLine();
             bw.write(">>当前程序/模型的替换时间：\n" + finalCurProgAndModelReplaceTime);
-            
+
             bw.close();
             reportFileWriter.close();
             return checkReportName;
@@ -394,7 +469,7 @@ public class DiagnosisUtils {
             e.printStackTrace();
             return new String();
         }
-        
+
     }
 
     public static void testGetFileLastModifiedTime() {
@@ -436,7 +511,7 @@ public class DiagnosisUtils {
         }
     }
 
-    
+
 
     public static void main(String[] args) {
         // 调用实例

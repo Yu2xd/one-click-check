@@ -1,15 +1,18 @@
+package org.example.controlsys.demos.controller;
 
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import com.alibaba.fastjson.JSONObject;
 
+import static org.example.controlsys.demos.controller.DiagnosisUtils.getLatestRecords;
+
 public class DiagnosisImpl {
 
     // 需要查看最新修改日期的文件
-    public static final List<String> filesName = Arrays.asList("./BlankImgCheck.py", 
-                                                                "./DiagnosisImpl.java",
-                                                                "./DiagnosisUtils.java"); 
+    public static final List<String> filesName = Arrays.asList("D:\\idea projects\\controlsys\\src\\main\\java\\org\\example\\controlsys\\demos\\controller\\BlankImgCheck.py",
+            "D:\\idea projects\\controlsys\\src\\main\\java\\org\\example\\controlsys\\demos\\controller\\DiagnosisImpl.java",
+            "D:\\idea projects\\controlsys\\src\\main\\java\\org\\example\\controlsys\\demos\\controller\\DiagnosisUtils.java");
 
     public static final String  endpoint = "http://221.2.171.221:34242";//minio服务器地址
 
@@ -26,7 +29,7 @@ public class DiagnosisImpl {
     // 数据集存放路径
     public static final String  dataDir = "";
 
-    public static void checkReport() throws IOException {   
+    public static JSONObject checkReport() throws IOException {
         // TODO 获取光机信息, 获取失败请返回空字符串
         String xRayState = "";
 
@@ -34,7 +37,7 @@ public class DiagnosisImpl {
         String detectorState = "";
 
         // TODO 获取喷吹信息, 获取失败请返回空字符串
-        String penState = "";
+        String penState =getLatestRecords(100,"D:\\idea projects\\controlsys\\src\\main\\java\\org\\example\\controlsys\\demos\\controller\\jet1.txt");
 
         // TODO 获取分选程序信息, 获取失败请返回空字符串
         String progState = "";
@@ -46,7 +49,7 @@ public class DiagnosisImpl {
         String beltSpeedState = "";
         try {
             // 调用新实现的方法获取皮带速度信息
-            beltSpeedState = DiagnosisUtils.getBeltSpeedInfo();
+            beltSpeedState =DiagnosisUtils.getBeltSpeedInfo();
         } catch (IOException e) {
             System.err.println("获取皮带速度信息失败: " + e.getMessage());
             // 如果获取失败，保持空字符串
@@ -60,12 +63,12 @@ public class DiagnosisImpl {
         String blankDetectionState = DiagnosisUtils.checkBlankImg(dataDir);
 
         // 生成检测报告
-        String checkReportName = DiagnosisUtils.generateCheckReport(xRayState, detectorState, penState, beltSpeedState, progState, 
-                                            collectState, curProgAndModelReplaceTime, blankDetectionState);
+        String checkReportName = DiagnosisUtils.generateCheckReport(xRayState, detectorState, penState, beltSpeedState, progState,
+                collectState, curProgAndModelReplaceTime, blankDetectionState);
 
         System.out.println(checkReportName);
         // 返回信息
-        // JSONObject res = new JSONObject();
+        JSONObject res = new JSONObject();
         if (!checkReportName.isEmpty()) {
             System.out.println(String.format("开始上传: %s", checkReportName));
             // 上传检测报告
@@ -78,20 +81,20 @@ public class DiagnosisImpl {
                         localFilePath + checkReportName // 本地文件路径
                 );
                 System.out.println("File uploaded successfully");
-                // 返回成功信息
-                // res.put("code", 200)
+                //返回成功信息
+                res.put("code", 200);
             } catch (Exception e) {
                 System.err.println("Error occurred: " + e.getMessage());
                 e.printStackTrace();
-                // 返回失败信息
-                // res.put("code", 500)
+                //返回失败信息
+                res.put("code", 500);
             }
-        } 
+        }
 
         // TODO 响应请求
         // 1、checkReport 返回类型改为 JSONObject
         // 2、用法可查看代码 line 59、73、78、85
-        // return res
+        return res;
     }
 
     public static void main(String[] args) {
