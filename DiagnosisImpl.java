@@ -9,41 +9,17 @@ import static org.example.controlsys.demos.controller.DiagnosisUtils.getLatestRe
 
 public class DiagnosisImpl {
 
-    // 需要查看最新修改日期的文件
-    public static final List<String> filesName = Arrays.asList("D:\\idea projects\\controlsys\\src\\main\\java\\org\\example\\controlsys\\demos\\controller\\BlankImgCheck.py",
-            "D:\\idea projects\\controlsys\\src\\main\\java\\org\\example\\controlsys\\demos\\controller\\DiagnosisImpl.java",
-            "D:\\idea projects\\controlsys\\src\\main\\java\\org\\example\\controlsys\\demos\\controller\\DiagnosisUtils.java");
-
-    // 喷吹信息历史记录                                                            
-    public static final String penRecordPath = "./penRecord.txt";
-
-    // 获取最新 penRecordDays 天的喷吹记录
-    public static final int penRecordDays = 3;
-
-    public static final String  endpoint = "http://221.2.171.221:34242";//minio服务器地址
-
-    public static final String  accessKey = "jzth";//minio服务器用户名
-
-    public static final String  secretKey = "JzTh267421";//minio服务器密码
-
-    public static final String  bucketName = "uploadtest";//minio服务器桶名
-
-    public static final String  objectPath = "document/asd/";//minio服务器桶内路径
-
-    public static final String  localFilePath = "./";//本地文件路径
-
-    // 数据集存放路径
-    public static final String  dataDir = "";
-
     public static JSONObject checkReport() throws IOException {
+        // 获取配置单例实例
+        DiagnosisConfig config = DiagnosisConfig.getInstance();
         // TODO 获取光机信息, 获取失败请返回空字符串
         String xRayState = "";
 
         // TODO 获取探测器信息, 获取失败请返回空字符串
         String detectorState = "";
 
-        // 获取喷吹信息, 获取失败请返回空字符串
-        String penState =getLatestRecords(penRecordDays, penRecordPath);
+        // TODO 获取喷吹信息, 获取失败请返回空字符串
+        String penState =getLatestRecords(3,"D:\\idea projects\\controlsys\\src\\main\\java\\org\\example\\controlsys\\demos\\controller\\jet.txt");
 
         // TODO 获取分选程序信息, 获取失败请返回空字符串
         String progState = "";
@@ -54,8 +30,9 @@ public class DiagnosisImpl {
         // TODO 获取皮带速度信息, 获取失败请返回空字符串
         String beltSpeedState = "";
         try {
-            // 调用新实现的方法获取皮带速度信息
-            beltSpeedState =DiagnosisUtils.getBeltSpeedInfo();
+            // 创建PLC配置对象并传入getBeltSpeedInfo方法
+            DiagnosisUtils.PlcConfig plcConfig = config.getPlcConfig();
+            beltSpeedState = DiagnosisUtils.getBeltSpeedInfo(plcConfig);
         } catch (IOException e) {
             System.err.println("获取皮带速度信息失败: " + e.getMessage());
             // 如果获取失败，保持空字符串
@@ -63,10 +40,10 @@ public class DiagnosisImpl {
         }
 
         // 获取当前程序/模型的替换时间
-        String curProgAndModelReplaceTime = DiagnosisUtils.getFilesListLastModifiedTime(filesName);
+        String curProgAndModelReplaceTime = DiagnosisUtils.getFilesListLastModifiedTime(config.getFilesName());
 
         // 皮带异常检测结果
-        String blankDetectionState = DiagnosisUtils.checkBlankImg(dataDir);
+        String blankDetectionState = DiagnosisUtils.checkBlankImg(config.getDataDir());
 
         // 生成检测报告
         String checkReportName = DiagnosisUtils.generateCheckReport(xRayState, detectorState, penState, beltSpeedState, progState,
@@ -78,13 +55,17 @@ public class DiagnosisImpl {
         if (!checkReportName.isEmpty()) {
             System.out.println(String.format("开始上传: %s", checkReportName));
             // 上传检测报告
-            MinioUploader uploader = new MinioUploader(endpoint, accessKey, secretKey);
+            MinioUploader uploader = new MinioUploader(
+                    config.getEndpoint(),
+                    config.getAccessKey(),
+                    config.getSecretKey()
+            );
             try {
                 // 上传文件
                 uploader.uploadFile(
-                        bucketName,                      // 存储桶名称
-                        objectPath + checkReportName,          // 对象存储路径
-                        localFilePath + checkReportName // 本地文件路径
+                        config.getBucketName(),                      // 存储桶名称
+                        config.getObjectPath() + checkReportName,    // 对象存储路径
+                        config.getLocalFilePath() + checkReportName  // 本地文件路径
                 );
                 System.out.println("File uploaded successfully");
                 //返回成功信息
@@ -106,6 +87,7 @@ public class DiagnosisImpl {
     public static void main(String[] args) {
         try {
             checkReport();
+//            DiagnosisUtils.getAllDeviceInfo();
         } catch (IOException e) {
             System.err.println("处理失败: " + e.getMessage());
         }

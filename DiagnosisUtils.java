@@ -23,28 +23,96 @@ import com.github.s7connector.impl.serializer.converter.RealConverter;
 
 public class DiagnosisUtils {
 
+    
+    /**
+     * PLC配置类，封装PLC连接和数据读取所需的参数
+     */
+    public static class PlcConfig {
+        private final String ip;
+        private final int port;
+        private final int rack;
+        private final int slot;
+        private final int dbNumber;
+        private final int speedFeedbackOffset;
+        private final int frequencyFeedbackOffset;
+        private final int frequencySetpointOffset;
+
+        /**
+         * 创建PLC配置对象
+         *
+         * @param ip PLC IP地址
+         * @param port S7端口
+         * @param rack 架机号
+         * @param slot 插槽号
+         * @param dbNumber 数据块号
+         * @param speedFeedbackOffset 速度反馈偏移量
+         * @param frequencyFeedbackOffset 频率反馈偏移量
+         * @param frequencySetpointOffset 频率设定值偏移量
+         */
+        public PlcConfig(String ip, int port, int rack, int slot, int dbNumber,
+                         int speedFeedbackOffset, int frequencyFeedbackOffset, int frequencySetpointOffset) {
+            this.ip = ip;
+            this.port = port;
+            this.rack = rack;
+            this.slot = slot;
+            this.dbNumber = dbNumber;
+            this.speedFeedbackOffset = speedFeedbackOffset;
+            this.frequencyFeedbackOffset = frequencyFeedbackOffset;
+            this.frequencySetpointOffset = frequencySetpointOffset;
+        }
+
+        public String getIp() {
+            return ip;
+        }
+
+        public int getPort() {
+            return port;
+        }
+
+        public int getRack() {
+            return rack;
+        }
+
+        public int getSlot() {
+            return slot;
+        }
+
+        public int getDbNumber() {
+            return dbNumber;
+        }
+
+        public int getSpeedFeedbackOffset() {
+            return speedFeedbackOffset;
+        }
+
+        public int getFrequencyFeedbackOffset() {
+            return frequencyFeedbackOffset;
+        }
+
+        public int getFrequencySetpointOffset() {
+            return frequencySetpointOffset;
+        }
+    }
+
     /**
      * 获取皮带速度信息
      * 读取速度反馈、频率反馈和给定频率的值，每个值读取5次（每秒读取一次）
      *
+     * @param plcConfig PLC配置对象，包含连接参数和数据偏移量
      * @return 格式化的速度和频率信息
      * @throws IOException 如果读取失败
      */
-    // PLC IP 地址
-    private static final String PLC_IP = "192.168.10.22";
-    // S7 端口
-    private static final int S7_PORT = 102;
-    public static String getBeltSpeedInfo() throws IOException {
+    public static String getBeltSpeedInfo(PlcConfig plcConfig) throws IOException {
         S7Connector s7Connector = null;
         try {
-            // 创建S7的连接
+            // 创建S7的连接，使用配置对象中的参数
             s7Connector = S7ConnectorFactory
                     .buildTCPConnector()
-                    .withHost(PLC_IP)//plc Ip地址
-                    .withPort(S7_PORT)  // 标准S7端口
+                    .withHost(plcConfig.getIp())
+                    .withPort(plcConfig.getPort())
                     .withTimeout(10000)  // 连接超时时间
-                    .withRack(0)  // 架机号
-                    .withSlot(1)  // 插槽号
+                    .withRack(plcConfig.getRack())
+                    .withSlot(plcConfig.getSlot())
                     .build();
 
             // 存储读取的值
@@ -52,11 +120,11 @@ public class DiagnosisUtils {
             float[] frequencyFeedbackValues = new float[5];
             float[] frequencySetpointValues = new float[5];
 
-            // 定义DB4地址和偏移量
-            final int dbNumber = 4;  // DB4
-            final int speedFeedbackOffset = 28;  // 速度反馈 DB4 28.0
-            final int frequencyFeedbackOffset = 20;  // 频率反馈 DB4 20.0
-            final int frequencySetpointOffset = 44;  // 频率给定值 DB4 44.0
+            // 从配置获取数据块和偏移量
+            final int dbNumber = plcConfig.getDbNumber();
+            final int speedFeedbackOffset = plcConfig.getSpeedFeedbackOffset();
+            final int frequencyFeedbackOffset = plcConfig.getFrequencyFeedbackOffset();
+            final int frequencySetpointOffset = plcConfig.getFrequencySetpointOffset();
 
             // 创建实数转换器
             RealConverter realConverter = new RealConverter();
@@ -96,11 +164,28 @@ public class DiagnosisUtils {
                 try {
                     s7Connector.close();
                 } catch (Exception e) {
-                    // 关闭连接时的异常可以记录但不要抛出
                     System.err.println("关闭PLC连接失败: " + e.getMessage());
                 }
             }
         }
+    }
+    /**
+     * 将浮点数组格式化为 [x.xx,x.xx,x.xx,x.xx,x.xx] 形式的字符串
+     *
+     * @param array 浮点数组
+     * @return 格式化的字符串
+     */
+    private static String formatArray(float[] array) {
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < array.length; i++) {
+            // 使用String.format保留两位小数
+            sb.append(String.format("%.2f", array[i]));
+            if (i < array.length - 1) {
+                sb.append(",");
+            }
+        }
+        sb.append("]");
+        return sb.toString();
     }
     public static String getLatestRecords(int x,String path){
         try {
@@ -182,24 +267,7 @@ public class DiagnosisUtils {
         }
     }
 
-    /**
-     * 将浮点数组格式化为 [x.xx,x.xx,x.xx,x.xx,x.xx] 形式的字符串
-     *
-     * @param array 浮点数组
-     * @return 格式化的字符串
-     */
-    private static String formatArray(float[] array) {
-        StringBuilder sb = new StringBuilder("[");
-        for (int i = 0; i < array.length; i++) {
-            // 使用String.format保留两位小数
-            sb.append(String.format("%.2f", array[i]));
-            if (i < array.length - 1) {
-                sb.append(",");
-            }
-        }
-        sb.append("]");
-        return sb.toString();
-    }
+
 
     /**
      * 获取指定文件的最后修改时间
@@ -445,7 +513,7 @@ public class DiagnosisUtils {
             bw.write(">>探测器：" + finalDetectorState);
             bw.newLine();
             bw.newLine();
-            bw.write(">>喷吹：\n" + finalPenState);
+            bw.write(">>喷吹：" + finalPenState);
             bw.newLine();
             bw.newLine();
             bw.write(">>皮带速度：\n" + finalBeltSpeedState);
